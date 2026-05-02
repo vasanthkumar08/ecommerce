@@ -26,16 +26,22 @@ import csrfProtection from "./middleware/csrfProtection.js";
 import requireDatabase from "./middleware/dbReady.js";
 import { getDatabaseStatus } from "./config/db.js";
 
+const normalizeOrigin = (origin) => String(origin || "").trim().replace(/\/+$/, "");
+
 const allowedOrigins = [
   "http://localhost:3000",
-  "http://localhost:5174",
   "http://localhost:5173",
-  ...(process.env.CLIENT_URL ? process.env.CLIENT_URL.split(",").map((origin) => origin.trim()) : []),
-].filter(Boolean);
+  "https://ecommerce-frontend-three-psi.vercel.app",
+].map(normalizeOrigin);
 
 const corsOptions = {
   origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    const normalizedOrigin = normalizeOrigin(origin);
+    const isAllowed = !origin || allowedOrigins.includes(normalizedOrigin);
+
+    console.log(`[cors] origin=${origin || "no-origin"} allowed=${isAllowed}`);
+
+    if (isAllowed) {
       callback(null, true);
       return;
     }
@@ -43,6 +49,10 @@ const corsOptions = {
     callback(new Error("CORS not allowed"));
   },
   credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "Apollo-Require-Preflight", "X-CSRF-Token"],
+  preflightContinue: false,
+  optionsSuccessStatus: 200,
 };
 
 const sanitizeXssInPlace = (value) => {
@@ -106,11 +116,11 @@ export const createApp = async () => {
 
   app.set("trust proxy", Number(process.env.TRUST_PROXY || 1));
   app.disable("x-powered-by");
+  app.use(cors(corsOptions));
+  app.options(/.*/, cors(corsOptions));
   app.use(helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" },
   }));
-  app.use(cors(corsOptions));
-  app.options(/.*/, cors(corsOptions));
   app.use(compression());
   app.use(cookieParser());
   app.use(express.json({ limit: "1mb" }));
@@ -143,7 +153,8 @@ export const createApp = async () => {
     });
   });
 
-  app.use("/graphql", requireDatabase, cors(corsOptions), expressMiddleware(apolloServer, { context: createGraphQLContext }));
+  app.options("/graphql", cors(corsOptions));
+  app.post("/graphql", cors(corsOptions), requireDatabase, expressMiddleware(apolloServer, { context: createGraphQLContext }));
 
   app.use("/api/auth", requireDatabase, authRateLimiter, authRoutes);
   app.use("/api/products", requireDatabase, restRateLimiter, productRoutes);
