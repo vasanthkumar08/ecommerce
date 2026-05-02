@@ -49,7 +49,14 @@ const corsOptions = {
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "Apollo-Require-Preflight", "X-CSRF-Token"],
+  allowedHeaders: [
+    "Accept",
+    "Content-Type",
+    "Authorization",
+    "Apollo-Require-Preflight",
+    "X-CSRF-Token",
+    "X-Requested-With",
+  ],
   preflightContinue: false,
   optionsSuccessStatus: 200,
 };
